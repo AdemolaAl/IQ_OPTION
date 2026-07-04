@@ -37,6 +37,70 @@
   /* the not() rule is a fallback; overridden immediately below if dark */
 }
 
+
+/* Force clean white inputs in light mode, no matter what */
+:root[data-theme="light"] .input,
+:root[data-theme="light"] select.input,
+:root[data-theme="light"] .stepper {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f1216 !important;
+  border: 1px solid #dfe4ec !important;
+}
+
+:root[data-theme="light"] .input::placeholder {
+  color: #9aa3af !important;
+}
+
+:root[data-theme="light"] .segmented {
+  background: #eef1f6 !important;
+  border: 1px solid #dfe4ec !important;
+}
+
+:root[data-theme="light"] .seg.active {
+  background: #ffffff !important;
+  color: #0f1216 !important;
+}
+
+:root[data-theme="light"] .chip {
+  background: #ffffff !important;
+  color: #6b7683 !important;
+  border: 1px solid #dfe4ec !important;
+}
+
+:root[data-theme="light"] .chip.active {
+  background: #2481cc !important;
+  color: white !important;
+}
+
+:root[data-theme="light"] .icon-btn {
+  background: #ffffff !important;
+  color: #0f1216 !important;
+  border: 1px solid #dfe4ec !important;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --surface-2: #f4f6fa;   /* was #eef1f6 — now distinct */
+  --border: #dfe4ec;
+  --text: #0f1216;
+  --text-dim: #6b7683;
+  --accent: #2481cc;
+  --accent-hover: #1f6fb0;
+  --success: #16a34a;
+  --success-bg: rgba(22, 163, 74, 0.08);
+  --success-border: rgba(22, 163, 74, 0.2);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.08);
+  --danger-border: rgba(220, 38, 38, 0.2);
+  --warning: #b45309;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --warning-border: rgba(245, 158, 11, 0.25);
+  --shadow: 0 4px 20px rgba(15, 18, 22, 0.06);
+  --shadow-soft: 0 1px 3px rgba(15, 18, 22, 0.06);
+}
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     color-scheme: light;
