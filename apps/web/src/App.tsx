@@ -62,7 +62,7 @@ export default function App() {
 
   return (
     <>
-      <div style={{ fontSize: 9, color: "var(--text-dim)" }}>{BUILD}</div>
+      <div style={{ fontSize: 9, color: "var(--text-dim)" }}>{BUILD}?????????????????</div>
       <ToastStack toasts={toasts} />
       <div className="app">
         <Header user={tgUser} onDisconnect={screen === "dashboard" ? () => {
