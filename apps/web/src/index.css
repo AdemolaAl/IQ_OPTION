@@ -1,5 +1,6 @@
 :root {
   /* Dark (default) */
+  color-scheme: dark;
   --bg: #0f1216;
   --surface: #1a1f27;
   --surface-2: #232a34;
@@ -27,6 +28,7 @@
 
 /* Light theme — applied by JS when Telegram reports light mode */
 :root[data-theme="light"] {
+    color-scheme: light;
   --bg: #eef1f6;
   --surface: #ffffff;
   --surface-2: #f4f6fa;
@@ -329,16 +331,6 @@ select.input {
   align-items: center;
 }
 
-.stepper {
-  width: 44px;
-  height: 44px;
-  background: var(--surface-2);
-  border-radius: var(--radius-sm);
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text);
-  flex-shrink: 0;
-}
 
 .amount-row .input { text-align: center; font-weight: 600; font-size: 18px; }
 
@@ -499,4 +491,34 @@ select.input {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+
+.input,
+select.input,
+.stepper,
+.chip,
+.seg {
+  background-color: var(--surface-2);
+}
+
+select.input {
+  background-color: var(--surface-2);
+  color: var(--text);
+}
+
+/* Autofill fix — Chrome injects yellow */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Fix segmented active state in light mode explicitly */
+:root[data-theme="light"] .seg.active {
+  background: #ffffff;
+  color: #0f1216;
+  box-shadow: 0 1px 3px rgba(15, 18, 22, 0.1);
 }
