@@ -148,7 +148,10 @@ function IqLogin({ onSuccess, onError }: { onSuccess: () => void; onError: (m: s
 }
 
 /* ---------- Dashboard ---------- */
-const ASSETS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "EURJPY"];
+const ASSETS = [
+  "EURUSD", "GBPUSD", "USDJPY", "AUDUSD",   // weekday
+  "EURUSD-OTC", "GBPUSD-OTC", "USDJPY-OTC"  // weekend/24-7
+];
 const QUICK_AMOUNTS = [1, 5, 10, 25, 50];
 const DURATIONS = [1, 5, 15];
 

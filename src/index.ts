@@ -14,9 +14,36 @@ const PORT = Number(process.env.PORT ?? 3000);
 if (!BOT_TOKEN || !WEB_APP_URL) throw new Error("missing required env");
 
 const bot = new Bot(BOT_TOKEN);
-bot.command("start", (ctx) => ctx.reply("Tap to open:", {
-  reply_markup: { inline_keyboard: [[{ text: "🚀 Open", web_app: { url: WEB_APP_URL } }]] },
-}));
+bot.command("start", async (ctx) => {
+  const name = ctx.from?.first_name ?? "there";
+  await ctx.reply(
+    `👋 Hey ${name}, welcome to IQBOTIX!\n\n` +
+      `Trade IQ Option straight from Telegram — check your balance, place trades, and stay in control.\n\n` +
+      `Tap below to get started 👇`,
+    {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🚀 Open App", web_app: { url: WEB_APP_URL } }],
+          [{ text: "ℹ️ How it works", callback_data: "help" }],
+        ],
+      },
+    }
+  );
+});
+
+bot.callbackQuery("help", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    `📘 *How IQBOTIX works*\n\n` +
+      `1️⃣ Tap *Open App* to launch the trading dashboard\n` +
+      `2️⃣ Connect your IQ Option account (use a demo first!)\n` +
+      `3️⃣ Pick an asset, set your amount, and trade\n\n` +
+      `⚠️ Only use a *demo account* while getting familiar. ` +
+      `Automated trading via unofficial APIs carries risk.\n\n` +
+      `Need help? Just message this bot.`,
+    { parse_mode: "Markdown" }
+  );
+});
 bot.start();
 
 const app = Fastify({ logger: true });
