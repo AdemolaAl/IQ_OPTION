@@ -337,12 +337,16 @@ function MiniSpinner() {
 
 /* ---------- Theme ---------- */
 function applyTelegramTheme(tg: NonNullable<Window["Telegram"]>["WebApp"]) {
-  const p = tg.themeParams;
   const root = document.documentElement;
+
+  // Set data-theme so our CSS switches palette
+  root.setAttribute("data-theme", tg.colorScheme === "light" ? "light" : "dark");
+
+  // Optionally let Telegram's exact bg color show through if user has a custom theme
+  const p = tg.themeParams;
   if (p.bg_color) root.style.setProperty("--bg", p.bg_color);
   if (p.secondary_bg_color) root.style.setProperty("--surface", p.secondary_bg_color);
   if (p.text_color) root.style.setProperty("--text", p.text_color);
   if (p.hint_color) root.style.setProperty("--text-dim", p.hint_color);
   if (p.button_color) root.style.setProperty("--accent", p.button_color);
-  if (p.section_separator_color) root.style.setProperty("--border", p.section_separator_color);
 }

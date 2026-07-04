@@ -1,5 +1,5 @@
 :root {
-  /* Fallbacks; overridden by Telegram theme at runtime */
+  /* Dark (default) */
   --bg: #0f1216;
   --surface: #1a1f27;
   --surface-2: #232a34;
@@ -9,14 +9,43 @@
   --accent: #3390ec;
   --accent-hover: #2a7dd1;
   --success: #26c281;
+  --success-bg: rgba(38, 194, 129, 0.12);
+  --success-border: rgba(38, 194, 129, 0.25);
   --danger: #ef4c4c;
+  --danger-bg: rgba(239, 76, 76, 0.12);
+  --danger-border: rgba(239, 76, 76, 0.25);
   --warning: #f5a623;
+  --warning-bg: rgba(245, 166, 35, 0.12);
+  --warning-border: rgba(245, 166, 35, 0.25);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.15);
 
   --radius: 12px;
   --radius-sm: 8px;
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.15);
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+}
+
+/* Light theme — applied by JS when Telegram reports light mode */
+:root[data-theme="light"] {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-2: #f0f3f7;
+  --border: #e2e6ec;
+  --text: #0f1216;
+  --text-dim: #6b7683;
+  --accent: #2481cc;
+  --accent-hover: #1f6fb0;
+  --success: #16a34a;
+  --success-bg: rgba(22, 163, 74, 0.08);
+  --success-border: rgba(22, 163, 74, 0.2);
+  --danger: #dc2626;
+  --danger-bg: rgba(220, 38, 38, 0.08);
+  --danger-border: rgba(220, 38, 38, 0.2);
+  --warning: #b45309;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --warning-border: rgba(245, 158, 11, 0.25);
+  --shadow: 0 4px 20px rgba(15, 18, 22, 0.06);
+  --shadow-soft: 0 1px 3px rgba(15, 18, 22, 0.06);
 }
 
 * {
@@ -90,8 +119,10 @@ input, select {
 .header-sub {
   font-size: 12px;
   color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-
 .status-dot {
   width: 8px;
   height: 8px;
@@ -313,33 +344,21 @@ input, select {
 }
 
 .alert-warn {
-  background: rgba(245, 166, 35, 0.12);
-  color: #f5a623;
-  border: 1px solid rgba(245, 166, 35, 0.25);
+  background: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid var(--warning-border);
 }
 
 .alert-error {
-  background: rgba(239, 76, 76, 0.12);
-  color: #ff7070;
-  border: 1px solid rgba(239, 76, 76, 0.25);
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
 }
 
 .alert-success {
-  background: rgba(38, 194, 129, 0.12);
-  color: #26c281;
-  border: 1px solid rgba(38, 194, 129, 0.25);
-}
-
-/* Toast */
-.toast-wrap {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  right: 16px;
-  z-index: 100;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success-border);
 }
 
 .toast {
@@ -355,7 +374,21 @@ input, select {
   display: flex;
   gap: 12px;
   align-items: center;
+  color: var(--text);
 }
+
+/* Toast */
+.toast-wrap {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
 
 .toast-icon {
   width: 24px;
