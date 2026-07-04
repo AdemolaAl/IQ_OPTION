@@ -1,4 +1,4 @@
-const IQ_SERVICE_URL = "http://localhost:8000";
+const IQ_SERVICE_URL = "https://iqoption-production-65ce.up.railway.app";
 
 export const iqClient = {
   async login(email: string, password: string, accountType = "PRACTICE") {
