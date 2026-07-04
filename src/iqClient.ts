@@ -1,28 +1,23 @@
-const IQ_SERVICE_URL = "https://iqoption-production-65ce.up.railway.app";
+const IQ_SERVICE_URL = process.env.IQ_SERVICE_URL!;
+const INTERNAL_KEY = process.env.INTERNAL_KEY!;
+
+async function call(path: string, body: any) {
+  const r = await fetch(`${IQ_SERVICE_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Internal-Key": INTERNAL_KEY },
+    body: JSON.stringify(body),
+  });
+  const text = await r.text();
+  let data: any;
+  try { data = JSON.parse(text); } catch { data = { detail: text }; }
+  return { ok: r.ok, status: r.status, data };
+}
 
 export const iqClient = {
-  async login(email: string, password: string, accountType = "PRACTICE") {
-    const r = await fetch(`${IQ_SERVICE_URL}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, account_type: accountType }),
-    });
-    if (!r.ok) throw new Error(`login failed: ${await r.text()}`);
-    return r.json() as Promise<{ ok: boolean; balance: number }>;
-  },
-
-  async balance() {
-    const r = await fetch(`${IQ_SERVICE_URL}/balance`);
-    return r.json() as Promise<{ balance: number }>;
-  },
-
-  async placeOrder(asset: string, amount: number, direction: "call" | "put", duration: number) {
-    const r = await fetch(`${IQ_SERVICE_URL}/order`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ asset, amount, direction, duration }),
-    });
-    if (!r.ok) throw new Error(`order failed: ${await r.text()}`);
-    return r.json() as Promise<{ order_id: number }>;
-  },
+  login: (userId: string, email: string, password: string, accountType = "PRACTICE") =>
+    call("/login", { user_id: userId, email, password, account_type: accountType }),
+  balance: (userId: string) => call("/balance", { user_id: userId }),
+  placeOrder: (userId: string, asset: string, amount: number, direction: "call" | "put", duration: number) =>
+    call("/order", { user_id: userId, asset, amount, direction, duration }),
+  logout: (userId: string) => call("/logout", { user_id: userId }),
 };

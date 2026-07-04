@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import clsx from "clsx";
+import { api, setToken, clearToken, type TgUser } from "./api";
+import "./index.css";
 
 declare global {
   interface Window {
@@ -7,270 +10,336 @@ declare global {
         ready: () => void;
         expand: () => void;
         initData: string;
-        HapticFeedback: { impactOccurred: (style: string) => void; notificationOccurred: (t: string) => void };
+        HapticFeedback: {
+          impactOccurred: (s: string) => void;
+          notificationOccurred: (t: string) => void;
+        };
         themeParams: Record<string, string>;
+        colorScheme: "dark" | "light";
       };
     };
   }
 }
 
-const API = import.meta.env.VITE_API_URL;
+type Screen = "boot" | "iq-login" | "dashboard";
+type Toast = { id: number; type: "ok" | "err"; text: string };
 
-type TgUser = { id: number; first_name: string; username?: string };
-type Screen = "loading" | "iq-login" | "dashboard";
+const haptic = {
+  tap: () => window.Telegram?.WebApp.HapticFeedback.impactOccurred("light"),
+  success: () => window.Telegram?.WebApp.HapticFeedback.notificationOccurred("success"),
+  error: () => window.Telegram?.WebApp.HapticFeedback.notificationOccurred("error"),
+};
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("loading");
+  const [screen, setScreen] = useState<Screen>("boot");
   const [tgUser, setTgUser] = useState<TgUser | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const pushToast = (type: "ok" | "err", text: string) => {
+    const id = Date.now();
+    setToasts((t) => [...t, { id, type, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
+  };
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    if (!tg) { setError("Open this inside Telegram"); return; }
+    if (!tg) { setBootError("Open this inside Telegram"); return; }
     tg.ready();
     tg.expand();
+    applyTelegramTheme(tg);
 
-    if (!tg.initData) { setError("No initData — open via bot button"); return; }
+    if (!tg.initData) { setBootError("Missing initData. Open via the bot button."); return; }
 
-    fetch(`${API}/api/auth`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ initData: tg.initData }),
-    })
-      .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e.error)))
-      .then(d => { setTgUser(d.user); setScreen("iq-login"); })
-      .catch(e => setError(String(e)));
+    api.auth(tg.initData)
+      .then((d) => { setToken(d.token); setTgUser(d.user); setScreen("iq-login"); })
+      .catch((e) => setBootError(e.message));
   }, []);
 
-  if (error) return <Shell><ErrorBox msg={error} /></Shell>;
-  if (screen === "loading") return <Shell><p>Loading…</p></Shell>;
+  if (bootError) return <Splash><ErrorState msg={bootError} /></Splash>;
+  if (screen === "boot") return <Splash><div className="spinner" /><p style={{ color: "var(--text-dim)" }}>Connecting…</p></Splash>;
 
   return (
-    <Shell>
-      <Header user={tgUser} />
-      {screen === "iq-login" && <IqLogin onSuccess={() => setScreen("dashboard")} />}
-      {screen === "dashboard" && <Dashboard onLogout={() => setScreen("iq-login")} />}
-    </Shell>
+    <>
+      <ToastStack toasts={toasts} />
+      <div className="app">
+        <Header user={tgUser} onDisconnect={screen === "dashboard" ? () => {
+          api.iqDisconnect().finally(() => { setScreen("iq-login"); });
+        } : undefined} />
+
+        {screen === "iq-login" && (
+          <IqLogin
+            onSuccess={() => { haptic.success(); pushToast("ok", "Connected"); setScreen("dashboard"); }}
+            onError={(m) => { haptic.error(); pushToast("err", m); }}
+          />
+        )}
+        {screen === "dashboard" && (
+          <Dashboard
+            onToast={pushToast}
+            onSessionLost={() => setScreen("iq-login")}
+          />
+        )}
+      </div>
+    </>
   );
 }
 
-// ---------------- IQ Login ----------------
-function IqLogin({ onSuccess }: { onSuccess: () => void }) {
+/* ---------- Login ---------- */
+function IqLogin({ onSuccess, onError }: { onSuccess: () => void; onError: (m: string) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [accountType, setAccountType] = useState<"PRACTICE" | "REAL">("PRACTICE");
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
-    setLoading(true); setErr(null);
+    setLoading(true);
     try {
-      const r = await fetch(`${API}/api/iq/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, account_type: accountType }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || d.error || "login failed");
-      window.Telegram?.WebApp.HapticFeedback.notificationOccurred("success");
+      await api.iqConnect(email, password, accountType);
       onSuccess();
-    } catch (e: any) {
-      setErr(e.message);
-      window.Telegram?.WebApp.HapticFeedback.notificationOccurred("error");
-    } finally { setLoading(false); }
+    } catch (e: any) { onError(e.message); }
+    finally { setLoading(false); }
   };
 
   return (
-    <Card title="Connect IQ Option">
-      <Warning>Use a demo account. Never share real credentials with untrusted apps.</Warning>
-      <Field label="Email">
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
-      </Field>
-      <Field label="Password">
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} />
-      </Field>
-      <Field label="Account">
-        <div style={{ display: "flex", gap: 8 }}>
-          {(["PRACTICE", "REAL"] as const).map(t => (
-            <button key={t} onClick={() => setAccountType(t)}
-              style={{ ...toggleStyle, ...(accountType === t ? activeToggle : {}) }}>
-              {t === "PRACTICE" ? "Demo" : "Real"}
-            </button>
-          ))}
+    <>
+      <div className="brand">
+        <div className="brand-mark">IQ</div>
+        <div className="brand-title">Connect Account</div>
+        <div className="brand-sub">Link your IQ Option to start trading</div>
+      </div>
+
+      <div className="alert alert-warn">
+        <span>⚠️</span>
+        <span>Use a demo account. Automated trading via unofficial APIs may violate broker ToS.</span>
+      </div>
+
+      <div className="card">
+        <div className="field">
+          <label className="field-label">Email</label>
+          <input className="input" type="email" placeholder="you@example.com"
+            value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-      </Field>
-      {err && <ErrorBox msg={err} />}
-      <button onClick={submit} disabled={loading || !email || !password} style={primaryBtn}>
-        {loading ? "Connecting…" : "Connect"}
-      </button>
-    </Card>
+
+        <div className="field">
+          <label className="field-label">Password</label>
+          <input className="input" type="password" placeholder="••••••••"
+            value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+
+        <div className="field">
+          <label className="field-label">Account Type</label>
+          <div className="segmented">
+            {(["PRACTICE", "REAL"] as const).map((t) => (
+              <button key={t} onClick={() => { haptic.tap(); setAccountType(t); }}
+                className={clsx("seg", accountType === t && "active")}>
+                {t === "PRACTICE" ? "Demo" : "Real"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button className="btn btn-primary" onClick={submit}
+          disabled={loading || !email || !password}>
+          {loading ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2, margin: 0 }} /> : "Connect"}
+        </button>
+      </div>
+    </>
   );
 }
 
-// ---------------- Dashboard ----------------
-function Dashboard({ onLogout }: { onLogout: () => void }) {
+/* ---------- Dashboard ---------- */
+const ASSETS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "EURJPY"];
+const QUICK_AMOUNTS = [1, 5, 10, 25, 50];
+const DURATIONS = [1, 5, 15];
+
+function Dashboard({ onToast, onSessionLost }: {
+  onToast: (t: "ok" | "err", m: string) => void;
+  onSessionLost: () => void;
+}) {
   const [balance, setBalance] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [asset, setAsset] = useState("EURUSD");
   const [amount, setAmount] = useState(1);
   const [duration, setDuration] = useState(1);
-  const [placing, setPlacing] = useState(false);
-  const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [placing, setPlacing] = useState<"call" | "put" | null>(null);
 
   const loadBalance = async () => {
-    try {
-      const r = await fetch(`${API}/api/iq/balance`);
-      const d = await r.json();
-      setBalance(d.balance);
-    } catch (e: any) { setMessage({ type: "err", text: e.message }); }
+    setRefreshing(true);
+    try { const { balance } = await api.iqBalance(); setBalance(balance); }
+    catch (e: any) {
+      if (e.message.includes("401") || e.message.includes("not connected")) {
+        onSessionLost();
+      } else onToast("err", e.message);
+    }
+    finally { setRefreshing(false); }
   };
 
   useEffect(() => { loadBalance(); }, []);
 
   const trade = async (direction: "call" | "put") => {
-    setPlacing(true); setMessage(null);
+    setPlacing(direction);
     try {
-      const r = await fetch(`${API}/api/iq/order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asset, amount, direction, duration }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || "order failed");
-      window.Telegram?.WebApp.HapticFeedback.notificationOccurred("success");
-      setMessage({ type: "ok", text: `Order placed: #${d.order_id}` });
+      const { order_id } = await api.iqOrder(asset, amount, direction, duration);
+      haptic.success();
+      onToast("ok", `${direction.toUpperCase()} placed · #${order_id}`);
       loadBalance();
     } catch (e: any) {
-      window.Telegram?.WebApp.HapticFeedback.notificationOccurred("error");
-      setMessage({ type: "err", text: e.message });
-    } finally { setPlacing(false); }
+      haptic.error();
+      onToast("err", e.message);
+    } finally { setPlacing(null); }
   };
 
   return (
     <>
-      <Card title="Balance">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 32, fontWeight: 700 }}>
-            {balance === null ? "…" : `$${balance.toFixed(2)}`}
+      <div className="card">
+        <div className="card-label">Balance</div>
+        <div className="balance">
+          <div className="balance-value">
+            <span className="currency">$</span>
+            {balance === null ? "—" : balance.toFixed(2)}
           </div>
-          <button onClick={loadBalance} style={secondaryBtn}>Refresh</button>
+          <button className={clsx("icon-btn", refreshing && "spin")}
+            onClick={() => { haptic.tap(); loadBalance(); }} aria-label="Refresh">
+            <RefreshIcon />
+          </button>
         </div>
-      </Card>
+      </div>
 
-      <Card title="Place Trade">
-        <Field label="Asset">
-          <select value={asset} onChange={e => setAsset(e.target.value)} style={inputStyle}>
-            {["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "EURJPY"].map(a => <option key={a}>{a}</option>)}
+      <div className="card">
+        <div className="card-label">New Trade</div>
+
+        <div className="field">
+          <label className="field-label">Asset</label>
+          <select className="input" value={asset} onChange={(e) => setAsset(e.target.value)}>
+            {ASSETS.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
-        </Field>
-        <Field label={`Amount ($${amount})`}>
-          <input type="number" min={1} value={amount}
-            onChange={e => setAmount(Math.max(1, Number(e.target.value)))} style={inputStyle} />
-        </Field>
-        <Field label={`Expiry (${duration} min)`}>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[1, 5, 15].map(m => (
-              <button key={m} onClick={() => setDuration(m)}
-                style={{ ...toggleStyle, ...(duration === m ? activeToggle : {}) }}>
-                {m}m
+        </div>
+
+        <div className="field">
+          <label className="field-label">Amount (USD)</label>
+          <div className="amount-row">
+            <button className="stepper" onClick={() => { haptic.tap(); setAmount((a) => Math.max(1, a - 1)); }}>−</button>
+            <input className="input" type="number" min={1} value={amount}
+              onChange={(e) => setAmount(Math.max(1, Number(e.target.value)))} />
+            <button className="stepper" onClick={() => { haptic.tap(); setAmount((a) => a + 1); }}>+</button>
+          </div>
+          <div className="chips">
+            {QUICK_AMOUNTS.map((v) => (
+              <button key={v} onClick={() => { haptic.tap(); setAmount(v); }}
+                className={clsx("chip", amount === v && "active")}>
+                ${v}
               </button>
             ))}
           </div>
-        </Field>
+        </div>
 
-        {message && (
-          <div style={{
-            padding: 12, borderRadius: 8, marginTop: 12,
-            background: message.type === "ok" ? "#0f5132" : "#842029",
-            color: "white",
-          }}>{message.text}</div>
-        )}
+        <div className="field">
+          <label className="field-label">Expiry</label>
+          <div className="segmented">
+            {DURATIONS.map((d) => (
+              <button key={d} onClick={() => { haptic.tap(); setDuration(d); }}
+                className={clsx("seg", duration === d && "active")}>
+                {d}m
+              </button>
+            ))}
+          </div>
+        </div>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button onClick={() => trade("call")} disabled={placing}
-            style={{ ...primaryBtn, background: "#16a34a", flex: 1 }}>
-            {placing ? "…" : "▲ CALL"}
+        <div className="trade-row">
+          <button className="btn btn-call" onClick={() => trade("call")} disabled={placing !== null}>
+            {placing === "call" ? <MiniSpinner /> : <>▲ CALL</>}
           </button>
-          <button onClick={() => trade("put")} disabled={placing}
-            style={{ ...primaryBtn, background: "#dc2626", flex: 1 }}>
-            {placing ? "…" : "▼ PUT"}
+          <button className="btn btn-put" onClick={() => trade("put")} disabled={placing !== null}>
+            {placing === "put" ? <MiniSpinner /> : <>▼ PUT</>}
           </button>
         </div>
-      </Card>
-
-      <button onClick={onLogout} style={{ ...secondaryBtn, width: "100%", marginTop: 16 }}>
-        Disconnect
-      </button>
+      </div>
     </>
   );
 }
 
-// ---------------- Building blocks ----------------
-function Shell({ children }: { children: React.ReactNode }) {
-  const tg = window.Telegram?.WebApp;
-  const bg = tg?.themeParams?.bg_color ?? "#f7f7f7";
-  const text = tg?.themeParams?.text_color ?? "#111";
+/* ---------- Chrome ---------- */
+function Header({ user, onDisconnect }: { user: TgUser | null; onDisconnect?: () => void }) {
+  const initial = user?.first_name?.[0]?.toUpperCase() ?? "?";
   return (
-    <div style={{
-      minHeight: "100vh", background: bg, color: text,
-      fontFamily: "system-ui, -apple-system, sans-serif", padding: 16,
-    }}>{children}</div>
-  );
-}
-
-function Header({ user }: { user: TgUser | null }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, opacity: 0.6 }}>Signed in as</div>
-      <div style={{ fontWeight: 600 }}>{user?.first_name} {user?.username && `@${user.username}`}</div>
+    <div className="header">
+      <div className="header-user">
+        <div className="avatar">{initial}</div>
+        <div>
+          <div className="header-name">{user?.first_name ?? "…"}</div>
+          <div className="header-sub" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span className="status-dot" /> Connected
+          </div>
+        </div>
+      </div>
+      {onDisconnect && (
+        <button className="icon-btn" onClick={() => { haptic.tap(); onDisconnect(); }} aria-label="Disconnect">
+          <LogoutIcon />
+        </button>
+      )}
     </div>
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Splash({ children }: { children: React.ReactNode }) {
+  return <div className="splash"><div className="splash-inner">{children}</div></div>;
+}
+
+function ErrorState({ msg }: { msg: string }) {
   return (
-    <div style={{
-      background: "white", borderRadius: 12, padding: 16, marginBottom: 12,
-      boxShadow: "0 1px 3px rgba(0,0,0,0.08)", color: "#111",
-    }}>
-      <div style={{ fontSize: 12, textTransform: "uppercase", opacity: 0.6, marginBottom: 8 }}>{title}</div>
-      {children}
+    <>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+      <div style={{ fontWeight: 600, marginBottom: 8 }}>Something went wrong</div>
+      <div style={{ color: "var(--text-dim)", fontSize: 14 }}>{msg}</div>
+    </>
+  );
+}
+
+function ToastStack({ toasts }: { toasts: Toast[] }) {
+  if (!toasts.length) return null;
+  return (
+    <div className="toast-wrap">
+      {toasts.map((t) => (
+        <div key={t.id} className={clsx("toast", t.type)}>
+          <div className="toast-icon">{t.type === "ok" ? "✓" : "!"}</div>
+          <div>{t.text}</div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/* ---------- Icons ---------- */
+function RefreshIcon() {
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ display: "block", fontSize: 13, marginBottom: 4, opacity: 0.8 }}>{label}</label>
-      {children}
-    </div>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
+      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+    </svg>
   );
 }
 
-function ErrorBox({ msg }: { msg: string }) {
-  return <div style={{ padding: 12, background: "#842029", color: "white", borderRadius: 8, marginTop: 8 }}>{msg}</div>;
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+      <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
 }
 
-function Warning({ children }: { children: React.ReactNode }) {
-  return <div style={{ padding: 10, background: "#fff3cd", color: "#664d03", borderRadius: 8, fontSize: 13, marginBottom: 12 }}>{children}</div>;
+function MiniSpinner() {
+  return <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2, margin: 0, borderTopColor: "white" }} />;
 }
 
-const inputStyle: React.CSSProperties = {
-  width: "100%", padding: "10px 12px", border: "1px solid #ddd",
-  borderRadius: 8, fontSize: 16, boxSizing: "border-box",
-};
-const primaryBtn: React.CSSProperties = {
-  width: "100%", padding: 14, background: "#2481cc", color: "white",
-  border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer",
-};
-const secondaryBtn: React.CSSProperties = {
-  padding: "8px 14px", background: "#e9ecef", color: "#111",
-  border: "none", borderRadius: 8, fontSize: 14, cursor: "pointer",
-};
-const toggleStyle: React.CSSProperties = {
-  flex: 1, padding: 10, background: "#f1f3f5", border: "1px solid #dee2e6",
-  borderRadius: 8, fontSize: 14, cursor: "pointer",
-};
-const activeToggle: React.CSSProperties = {
-  background: "#2481cc", color: "white", borderColor: "#2481cc",
-};
+/* ---------- Theme ---------- */
+function applyTelegramTheme(tg: NonNullable<Window["Telegram"]>["WebApp"]) {
+  const p = tg.themeParams;
+  const root = document.documentElement;
+  if (p.bg_color) root.style.setProperty("--bg", p.bg_color);
+  if (p.secondary_bg_color) root.style.setProperty("--surface", p.secondary_bg_color);
+  if (p.text_color) root.style.setProperty("--text", p.text_color);
+  if (p.hint_color) root.style.setProperty("--text-dim", p.hint_color);
+  if (p.button_color) root.style.setProperty("--accent", p.button_color);
+  if (p.section_separator_color) root.style.setProperty("--border", p.section_separator_color);
+}
