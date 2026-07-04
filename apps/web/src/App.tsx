@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { api, setToken, clearToken, type TgUser } from "./api";
+import { api, setToken, type TgUser } from "./api";
 import "./index.css";
 
 declare global {
