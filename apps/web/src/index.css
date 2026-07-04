@@ -1,5 +1,9 @@
+/* =========================================================
+   IQBOT PRO — Telegram Mini App styles
+   Single source of truth. No duplicates. No conflicts.
+   ========================================================= */
+
 :root {
-  /* Dark (default) */
   color-scheme: dark;
   --bg: #0f1216;
   --surface: #1a1f27;
@@ -26,12 +30,43 @@
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
 }
 
-/* Light theme — applied by JS when Telegram reports light mode */
-:root[data-theme="light"] {
+/* Light theme — activated by JS setting data-theme="light", OR
+   by the OS preference if JS didn't set it. */
+:root[data-theme="light"],
+:root:not([data-theme="dark"]) {
+  /* the not() rule is a fallback; overridden immediately below if dark */
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
     color-scheme: light;
+    --bg: #eef1f6;
+    --surface: #ffffff;
+    --surface-2: #eef1f6;
+    --border: #dfe4ec;
+    --text: #0f1216;
+    --text-dim: #6b7683;
+    --accent: #2481cc;
+    --accent-hover: #1f6fb0;
+    --success: #16a34a;
+    --success-bg: rgba(22, 163, 74, 0.08);
+    --success-border: rgba(22, 163, 74, 0.2);
+    --danger: #dc2626;
+    --danger-bg: rgba(220, 38, 38, 0.08);
+    --danger-border: rgba(220, 38, 38, 0.2);
+    --warning: #b45309;
+    --warning-bg: rgba(245, 158, 11, 0.1);
+    --warning-border: rgba(245, 158, 11, 0.25);
+    --shadow: 0 4px 20px rgba(15, 18, 22, 0.06);
+    --shadow-soft: 0 1px 3px rgba(15, 18, 22, 0.06);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
   --bg: #eef1f6;
   --surface: #ffffff;
-  --surface-2: #f4f6fa;
+  --surface-2: #eef1f6;
   --border: #dfe4ec;
   --text: #0f1216;
   --text-dim: #6b7683;
@@ -75,12 +110,14 @@ button {
   color: inherit;
 }
 
-input, select {
+input, select, textarea {
   font-family: inherit;
-  font-size: 16px; /* prevent iOS zoom */
+  font-size: 16px;
 }
 
-/* Layout */
+/* =========================================================
+   LAYOUT
+   ========================================================= */
 .app {
   max-width: 480px;
   margin: 0 auto;
@@ -95,45 +132,35 @@ input, select {
   margin-bottom: 24px;
 }
 
-.header-user {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+.header-user { display: flex; align-items: center; gap: 12px; }
 
 .avatar {
-  width: 40px;
-  height: 40px;
+  width: 40px; height: 40px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), #6b46ff);
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-  font-size: 16px;
+  display: grid; place-items: center;
+  font-weight: 600; font-size: 16px;
   color: white;
 }
 
-.header-name {
-  font-weight: 600;
-  font-size: 15px;
-}
+.header-name { font-weight: 600; font-size: 15px; color: var(--text); }
 
 .header-sub {
   font-size: 12px;
   color: var(--text-dim);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: flex; align-items: center; gap: 6px;
 }
+
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--success);
   box-shadow: 0 0 0 4px rgba(38, 194, 129, 0.15);
 }
 
-/* Cards */
+/* =========================================================
+   CARDS
+   ========================================================= */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -152,18 +179,15 @@ input, select {
   font-weight: 600;
 }
 
-/* Balance */
-.balance {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
+/* =========================================================
+   BALANCE
+   ========================================================= */
+.balance { display: flex; justify-content: space-between; align-items: flex-end; }
 
 .balance-value {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1;
+  font-size: 34px; font-weight: 700;
+  letter-spacing: -0.02em; line-height: 1;
+  color: var(--text);
 }
 
 .balance-value .currency {
@@ -173,26 +197,27 @@ input, select {
   font-weight: 500;
 }
 
+/* =========================================================
+   BUTTONS — icon
+   ========================================================= */
 .icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 40px; height: 40px;
   border-radius: var(--radius-sm);
-  background: var(--surface-2);
+  background: var(--surface-2) !important;
   border: 1px solid var(--border);
   color: var(--text);
-  display: grid;
-  place-items: center;
+  display: grid; place-items: center;
   transition: transform 0.15s, background 0.15s;
 }
 
 .icon-btn:active { transform: scale(0.94); }
-.icon-btn:hover { background: var(--border); }
+.icon-btn:hover { background: var(--border) !important; }
 .icon-btn.spin svg { animation: spin 0.6s linear infinite; }
 
-/* Fields */
-.field {
-  margin-bottom: 16px;
-}
+/* =========================================================
+   FORM FIELDS
+   ========================================================= */
+.field { margin-bottom: 16px; }
 
 .field-label {
   display: block;
@@ -202,39 +227,52 @@ input, select {
   font-weight: 500;
 }
 
+/* Inputs — !important to defeat browser dark form styling */
 .input {
   width: 100%;
   padding: 14px 16px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
   border-radius: var(--radius-sm);
-  color: var(--text);
+  color: var(--text) !important;
   transition: border-color 0.15s, background 0.15s;
   -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--accent);
-  background: var(--surface);
+  border-color: var(--accent) !important;
 }
 
-.input::placeholder { color: var(--text-dim); }
+.input::placeholder { color: var(--text-dim); opacity: 1; }
 
-/* Select needs its own arrow since we killed the native one */
+/* Select — kill native chrome and draw our own arrow */
 select.input {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b95a3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7683' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 40px;
 }
 
+/* Autofill fix */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* =========================================================
+   SEGMENTED CONTROL
+   ========================================================= */
 .segmented {
   display: flex;
   gap: 4px;
   padding: 4px;
-  background: var(--surface-2);
+  background: var(--surface-2) !important;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
 }
@@ -246,32 +284,67 @@ select.input {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-dim);
+  background: transparent !important;
   transition: all 0.15s;
-  background: transparent;
 }
 
 .seg.active {
-  background: var(--surface);
-  color: var(--text);
+  background: var(--surface) !important;
+  color: var(--text) !important;
   box-shadow: var(--shadow-soft);
 }
 
+.seg:active { transform: scale(0.97); }
+
+/* =========================================================
+   STEPPER + AMOUNT ROW
+   ========================================================= */
+.amount-row { display: flex; gap: 8px; align-items: center; }
+
 .stepper {
-  width: 44px;
-  height: 44px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  width: 44px; height: 44px;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border) !important;
   border-radius: var(--radius-sm);
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text);
+  font-size: 20px; font-weight: 600;
+  color: var(--text) !important;
   flex-shrink: 0;
 }
 
-.stepper:active { background: var(--border); }
-.seg:active { transform: scale(0.97); }
+.stepper:active { background: var(--border) !important; }
 
-/* Buttons */
+.amount-row .input {
+  text-align: center;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+/* =========================================================
+   CHIPS
+   ========================================================= */
+.chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+.chip {
+  padding: 6px 12px;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--text-dim);
+  transition: all 0.15s;
+}
+
+.chip:active { transform: scale(0.95); }
+
+.chip.active {
+  background: var(--accent) !important;
+  color: white !important;
+  border-color: var(--accent);
+}
+
+/* =========================================================
+   ACTION BUTTONS
+   ========================================================= */
 .btn {
   width: 100%;
   padding: 15px;
@@ -295,15 +368,7 @@ select.input {
 }
 
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn-primary:disabled {
-  background: var(--accent);
-  opacity: 0.4;
-  box-shadow: none;
-}
-.btn-ghost {
-  background: var(--surface-2);
-  color: var(--text);
-}
+.btn-primary:disabled { background: var(--accent); opacity: 0.4; box-shadow: none; }
 
 .btn-call {
   background: linear-gradient(180deg, #2ed57e, #26c281);
@@ -324,37 +389,9 @@ select.input {
   margin-top: 8px;
 }
 
-/* Amount stepper */
-.amount-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-
-.amount-row .input { text-align: center; font-weight: 600; font-size: 18px; }
-
-/* Chips (quick amounts) */
-.chips {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-.chip {
-  padding: 6px 12px;
-  background: var(--surface-2);
-  border-radius: 20px;
-  font-size: 13px;
-  color: var(--text-dim);
-  transition: all 0.15s;
-}
-
-.chip:active { transform: scale(0.95); }
-.chip.active { background: var(--accent); color: white; }
-
-/* Alerts */
+/* =========================================================
+   ALERTS
+   ========================================================= */
 .alert {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
@@ -366,22 +403,20 @@ select.input {
   animation: slideUp 0.25s ease;
 }
 
-.alert-warn {
-  background: var(--warning-bg);
-  color: var(--warning);
-  border: 1px solid var(--warning-border);
-}
+.alert-warn { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
+.alert-error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+.alert-success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
 
-.alert-error {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid var(--danger-border);
-}
-
-.alert-success {
-  background: var(--success-bg);
-  color: var(--success);
-  border: 1px solid var(--success-border);
+/* =========================================================
+   TOAST
+   ========================================================= */
+.toast-wrap {
+  position: fixed;
+  top: 16px; left: 16px; right: 16px;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
 }
 
 .toast {
@@ -400,25 +435,10 @@ select.input {
   color: var(--text);
 }
 
-/* Toast */
-.toast-wrap {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  right: 16px;
-  z-index: 100;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-
 .toast-icon {
-  width: 24px;
-  height: 24px;
+  width: 24px; height: 24px;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
+  display: grid; place-items: center;
   flex-shrink: 0;
   font-size: 14px;
 }
@@ -426,7 +446,9 @@ select.input {
 .toast.ok .toast-icon { background: var(--success); color: white; }
 .toast.err .toast-icon { background: var(--danger); color: white; }
 
-/* Splash / loading */
+/* =========================================================
+   SPLASH / LOADING
+   ========================================================= */
 .splash {
   min-height: 100vh;
   display: grid;
@@ -437,8 +459,7 @@ select.input {
 .splash-inner { text-align: center; }
 
 .spinner {
-  width: 32px;
-  height: 32px;
+  width: 32px; height: 32px;
   border: 3px solid var(--border);
   border-top-color: var(--accent);
   border-radius: 50%;
@@ -446,39 +467,28 @@ select.input {
   margin: 0 auto 16px;
 }
 
-/* Logo mark for login */
-.brand {
-  text-align: center;
-  margin-bottom: 24px;
-}
+/* =========================================================
+   BRAND / LOGIN
+   ========================================================= */
+.brand { text-align: center; margin-bottom: 24px; }
 
 .brand-mark {
-  width: 64px;
-  height: 64px;
+  width: 64px; height: 64px;
   margin: 0 auto 16px;
   border-radius: 16px;
   background: linear-gradient(135deg, var(--accent), #6b46ff);
-  display: grid;
-  place-items: center;
-  font-size: 28px;
-  font-weight: 700;
+  display: grid; place-items: center;
+  font-size: 28px; font-weight: 700;
   color: white;
   box-shadow: var(--shadow);
 }
 
-.brand-title {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
+.brand-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+.brand-sub { font-size: 14px; color: var(--text-dim); margin-top: 4px; }
 
-.brand-sub {
-  font-size: 14px;
-  color: var(--text-dim);
-  margin-top: 4px;
-}
-
-/* Animations */
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -491,34 +501,4 @@ select.input {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-
-.input,
-select.input,
-.stepper,
-.chip,
-.seg {
-  background-color: var(--surface-2);
-}
-
-select.input {
-  background-color: var(--surface-2);
-  color: var(--text);
-}
-
-/* Autofill fix — Chrome injects yellow */
-.input:-webkit-autofill,
-.input:-webkit-autofill:hover,
-.input:-webkit-autofill:focus {
-  -webkit-text-fill-color: var(--text);
-  -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset;
-  transition: background-color 5000s ease-in-out 0s;
-}
-
-/* Fix segmented active state in light mode explicitly */
-:root[data-theme="light"] .seg.active {
-  background: #ffffff;
-  color: #0f1216;
-  box-shadow: 0 1px 3px rgba(15, 18, 22, 0.1);
 }

@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { api, setToken, type TgUser } from "./api";
 import "./index.css";
 
+const BUILD = "v3-light-fix";
 declare global {
   interface Window {
     Telegram?: {
@@ -66,6 +67,7 @@ export default function App() {
         <Header user={tgUser} onDisconnect={screen === "dashboard" ? () => {
           api.iqDisconnect().finally(() => { setScreen("iq-login"); });
         } : undefined} />
+        <div style={{ fontSize: 9, color: "var(--text-dim)" }}>{BUILD}</div>
 
         {screen === "iq-login" && (
           <IqLogin
