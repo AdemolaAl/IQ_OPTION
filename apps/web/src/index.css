@@ -27,10 +27,10 @@
 
 /* Light theme — applied by JS when Telegram reports light mode */
 :root[data-theme="light"] {
-  --bg: #f5f7fa;
+  --bg: #eef1f6;
   --surface: #ffffff;
-  --surface-2: #f0f3f7;
-  --border: #e2e6ec;
+  --surface-2: #f4f6fa;
+  --border: #dfe4ec;
   --text: #0f1216;
   --text-dim: #6b7683;
   --accent: #2481cc;
@@ -176,6 +176,8 @@ input, select {
   height: 40px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
   display: grid;
   place-items: center;
   transition: transform 0.15s, background 0.15s;
@@ -206,6 +208,8 @@ input, select {
   border-radius: var(--radius-sm);
   color: var(--text);
   transition: border-color 0.15s, background 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .input:focus {
@@ -216,13 +220,21 @@ input, select {
 
 .input::placeholder { color: var(--text-dim); }
 
-/* Segmented toggles */
+/* Select needs its own arrow since we killed the native one */
+select.input {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b95a3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 40px;
+}
+
 .segmented {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   padding: 4px;
   background: var(--surface-2);
   border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
 }
 
 .seg {
@@ -233,6 +245,7 @@ input, select {
   font-weight: 500;
   color: var(--text-dim);
   transition: all 0.15s;
+  background: transparent;
 }
 
 .seg.active {
@@ -241,6 +254,19 @@ input, select {
   box-shadow: var(--shadow-soft);
 }
 
+.stepper {
+  width: 44px;
+  height: 44px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.stepper:active { background: var(--border); }
 .seg:active { transform: scale(0.97); }
 
 /* Buttons */
@@ -263,10 +289,15 @@ input, select {
 .btn-primary {
   background: var(--accent);
   color: white;
+  box-shadow: 0 2px 8px rgba(36, 129, 204, 0.25);
 }
 
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
-
+.btn-primary:disabled {
+  background: var(--accent);
+  opacity: 0.4;
+  box-shadow: none;
+}
 .btn-ghost {
   background: var(--surface-2);
   color: var(--text);
