@@ -1,117 +1,183 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import clsx from "clsx";
 import { api, setToken, type TgUser } from "./api";
 import "./index.css";
 
 declare global {
   interface Window {
-    Telegram?: {
-      WebApp: {
-        ready: () => void;
-        expand: () => void;
-        initData: string;
-        HapticFeedback: {
-          impactOccurred: (s: string) => void;
-          notificationOccurred: (t: string) => void;
-        };
-        themeParams: Record<string, string>;
-        colorScheme: "dark" | "light";
-      };
-    };
+    Telegram?: { WebApp: {
+      ready: () => void; expand: () => void; initData: string;
+      HapticFeedback: { impactOccurred: (s: string) => void; notificationOccurred: (t: string) => void };
+    }};
   }
 }
 
-type Screen = "boot" | "iq-login" | "dashboard";
-type Toast = { id: number; type: "ok" | "err"; text: string };
-
 const haptic = {
   tap: () => window.Telegram?.WebApp.HapticFeedback.impactOccurred("light"),
-  success: () => window.Telegram?.WebApp.HapticFeedback.notificationOccurred("success"),
-  error: () => window.Telegram?.WebApp.HapticFeedback.notificationOccurred("error"),
+  ok: () => window.Telegram?.WebApp.HapticFeedback.notificationOccurred("success"),
+  err: () => window.Telegram?.WebApp.HapticFeedback.notificationOccurred("error"),
 };
 
+type Me = TgUser & { hasAccess: boolean; isAdmin: boolean; autoTrade: boolean; autoAmount: number };
+type Stage = "boot" | "access" | "granted" | "iq-login" | "app";
+type Tab = "home" | "signals" | "trade";
+type Toast = { id: number; type: "ok" | "err"; text: string };
+
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("boot");
-  const [tgUser, setTgUser] = useState<TgUser | null>(null);
+  const [stage, setStage] = useState<Stage>("boot");
+  const [tab, setTab] = useState<Tab>("home");
+  const [me, setMe] = useState<Me | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [balPop, setBalPop] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const pushToast = (type: "ok" | "err", text: string) => {
+  const toast = useCallback((type: "ok" | "err", text: string) => {
     const id = Date.now();
     setToasts((t) => [...t, { id, type, text }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
-  };
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
+  }, []);
+
+  const refreshBalance = useCallback(async () => {
+    try {
+      const { balance } = await api.iqBalance();
+      setBalance(balance);
+      setBalPop(true); setTimeout(() => setBalPop(false), 500);
+    } catch { /* not connected yet */ }
+  }, []);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    if (!tg) { setBootError("Open this inside Telegram"); return; }
-    tg.ready();
-    tg.expand();
-    applyTelegramTheme(tg);
-
-    if (!tg.initData) { setBootError("Missing initData. Open via the bot button."); return; }
+    if (!tg) { setBootError("Open this app inside Telegram"); return; }
+    tg.ready(); tg.expand();
+    if (!tg.initData) { setBootError("Open via the bot button"); return; }
 
     api.auth(tg.initData)
-      .then((d) => { setToken(d.token); setTgUser(d.user); setScreen("iq-login"); })
+      .then((d) => {
+        setToken(d.token);
+        setMe(d.user as Me);
+        setStage(d.user.hasAccess ? "iq-login" : "access");
+      })
       .catch((e) => setBootError(e.message));
   }, []);
 
-  if (bootError) return <Splash><ErrorState msg={bootError} /></Splash>;
-  if (screen === "boot") return <Splash><div className="spinner" /><p style={{ color: "var(--text-dim)" }}>Connecting…</p></Splash>;
+  if (bootError) return <div className="splash"><div><div style={{fontSize:40}}>⚠️</div><b>{bootError}</b></div></div>;
+  if (stage === "boot") return <div className="splash"><div><div className="spinner" /><b>Loading iqbotix…</b></div></div>;
 
+  if (stage === "access") return (
+    <>
+      <ToastStack toasts={toasts} />
+      <AccessGate onGranted={() => { haptic.ok(); setStage("granted"); setTimeout(() => setStage("iq-login"), 1800); }}
+        onError={(m) => { haptic.err(); toast("err", m); }} />
+    </>
+  );
+
+  if (stage === "granted") return (
+    <div className="splash"><div className="granted">
+      <div className="big">✅</div>
+      <div className="t">Access granted</div>
+      <div className="note">Setting things up…</div>
+    </div></div>
+  );
+
+  if (stage === "iq-login") return (
+    <>
+      <ToastStack toasts={toasts} />
+      <IqLogin onDone={(bal) => { haptic.ok(); setBalance(bal); setStage("app"); toast("ok", "Connected to IQ Option"); }}
+        onError={(m) => { haptic.err(); toast("err", m); }} />
+    </>
+  );
+
+  // ====== main app ======
   return (
     <>
       <ToastStack toasts={toasts} />
-      <div className="app">
-        <Header user={tgUser} onDisconnect={screen === "dashboard" ? () => {
-          api.iqDisconnect().finally(() => { setScreen("iq-login"); });
-        } : undefined} />
+      <div className="appbar">
+        <div className="logo">iQ</div>
+        <div>
+          <h1>iqbotix</h1>
+          <div className="sub">Hi, {me?.first_name} 👋</div>
+        </div>
+        <div className="bal" onClick={() => { haptic.tap(); refreshBalance(); }}>
+          <div className={clsx("n", balPop && "pop")}>{balance === null ? "—" : `$${balance.toFixed(2)}`}</div>
+          <div className="l">Balance · tap ↻</div>
+        </div>
+      </div>
 
-        {screen === "iq-login" && (
-          <IqLogin
-            onSuccess={() => { haptic.success(); pushToast("ok", "Connected"); setScreen("dashboard"); }}
-            onError={(m) => { haptic.error(); pushToast("err", m); }}
-          />
-        )}
-        {screen === "dashboard" && (
-          <Dashboard
-            onToast={pushToast}
-            onSessionLost={() => setScreen("iq-login")}
-          />
-        )}
+      {tab === "home" && <Home me={me!} balance={balance} onGoTrade={() => setTab("trade")} onGoSignals={() => setTab("signals")} />}
+      {tab === "signals" && <Signals me={me!} toast={toast} onTraded={refreshBalance} onSettingsChange={(s) => setMe((m) => m ? { ...m, ...s } : m)} />}
+      {tab === "trade" && <Trade toast={toast} onTraded={refreshBalance} />}
+
+      <div className="tabbar">
+        {([["home","🏠","Home"],["signals","📡","Signals"],["trade","📈","Trade"]] as const).map(([k, ic, lab]) => (
+          <button key={k} className={clsx("tab", tab === k && "on")}
+            onClick={() => { haptic.tap(); setTab(k); }}>
+            <span className="ic">{ic}</span>{lab}
+          </button>
+        ))}
       </div>
     </>
   );
 }
 
-/* ---------- Login ---------- */
-function IqLogin({ onSuccess, onError }: { onSuccess: () => void; onError: (m: string) => void }) {
+/* ============ ONBOARDING ============ */
+function AccessGate({ onGranted, onError }: { onGranted: () => void; onError: (m: string) => void }) {
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (code.trim().length < 4) return onError("Enter a valid access code");
+    setLoading(true);
+    try { await api.verifyAccess(code); onGranted(); }
+    catch (e: any) { onError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="ob">
+      <div className="ob-hero">
+        <div className="ob-logo">iQ</div>
+        <div className="ob-title">Welcome to iqbotix</div>
+        <div className="ob-sub">Enter your access code to continue.<br />No code yet? Message the bot and the team will send you one.</div>
+      </div>
+      <div className="card">
+        <div className="field">
+          <label className="field-label">Access code</label>
+          <input className="input" value={code} onChange={(e) => setCode(e.target.value)}
+            placeholder="e.g. WELCOME2026" autoCapitalize="characters"
+            onKeyDown={(e) => e.key === "Enter" && submit()} />
+        </div>
+        <button className="btn" onClick={submit} disabled={loading || !code}>
+          {loading ? "Checking…" : "Unlock →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function IqLogin({ onDone, onError }: { onDone: (balance: number) => void; onError: (m: string) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
   const [accountType, setAccountType] = useState<"PRACTICE" | "REAL">("PRACTICE");
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
     setLoading(true);
-    try {
-      await api.iqConnect(email, password, accountType);
-      onSuccess();
-    } catch (e: any) { onError(e.message); }
+    try { const r = await api.iqConnect(email, password, accountType); onDone(r.balance); }
+    catch (e: any) { onError(e.message); }
     finally { setLoading(false); }
   };
 
   return (
-    <>
-      <div className="brand">
-        <div className="brand-mark">IQ</div>
-        <div className="brand-title">Connect Account</div>
-        <div className="brand-sub">Link your IQ Option to start trading</div>
+    <div className="ob">
+      <div className="ob-hero">
+        <div className="ob-logo">iQ</div>
+        <div className="ob-title">Connect IQ Option</div>
+        <div className="ob-sub">Your password goes straight to IQ Option — we never store it.</div>
       </div>
 
-      <div className="alert alert-warn">
-        <span>⚠️</span>
-        <span>Use a demo account. Automated trading via unofficial APIs may violate broker ToS.</span>
-      </div>
+      <div className="alert-warn">⚠️ <span>Use a <b>demo account</b> while getting familiar. Trading involves risk.</span></div>
 
       <div className="card">
         <div className="field">
@@ -119,107 +185,215 @@ function IqLogin({ onSuccess, onError }: { onSuccess: () => void; onError: (m: s
           <input className="input" type="email" placeholder="you@example.com"
             value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
-
         <div className="field">
           <label className="field-label">Password</label>
-          <input className="input" type="password" placeholder="••••••••"
-            value={password} onChange={(e) => setPassword(e.target.value)} />
+          <div style={{ position: "relative" }}>
+            <input className="input" type={showPwd ? "text" : "password"} placeholder="••••••••"
+              value={password} onChange={(e) => setPassword(e.target.value)} style={{ paddingRight: 46 }} />
+            <button style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 18 }}
+              onClick={() => setShowPwd((s) => !s)}>{showPwd ? "🙈" : "👁️"}</button>
+          </div>
         </div>
-
         <div className="field">
-          <label className="field-label">Account Type</label>
+          <label className="field-label">Account</label>
           <div className="segmented">
             {(["PRACTICE", "REAL"] as const).map((t) => (
-              <button key={t} onClick={() => { haptic.tap(); setAccountType(t); }}
-                className={clsx("seg", accountType === t && "active")}>
+              <button key={t} className={clsx("seg", accountType === t && "active")}
+                onClick={() => { haptic.tap(); setAccountType(t); }}>
                 {t === "PRACTICE" ? "Demo" : "Real"}
               </button>
             ))}
           </div>
         </div>
-
-        <button className="btn btn-primary" onClick={submit}
-          disabled={loading || !email || !password}>
-          {loading ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2, margin: 0 }} /> : "Connect"}
+        <button className="btn dark" onClick={submit} disabled={loading || !email || !password}>
+          {loading ? "Connecting…" : "Log in & launch 🚀"}
         </button>
       </div>
-    </>
+    </div>
   );
 }
 
-/* ---------- Dashboard ---------- */
-const ASSETS = [
-  "EURUSD", "GBPUSD", "USDJPY", "AUDUSD",   // weekday
-  "EURUSD-OTC", "GBPUSD-OTC", "USDJPY-OTC"  // weekend/24-7
-];
-const QUICK_AMOUNTS = [1, 5, 10, 25, 50];
-const DURATIONS = [1, 5, 15];
-
-function Dashboard({ onToast, onSessionLost }: {
-  onToast: (t: "ok" | "err", m: string) => void;
-  onSessionLost: () => void;
+/* ============ HOME ============ */
+function Home({ me, balance, onGoTrade, onGoSignals }: {
+  me: Me; balance: number | null; onGoTrade: () => void; onGoSignals: () => void;
 }) {
-  const [balance, setBalance] = useState<number | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [asset, setAsset] = useState("EURUSD");
+  return (
+    <div className="screen">
+      <div className="eyebrow">Dashboard</div>
+      <div className="h2">Good to see you, {me.first_name}</div>
+      <div className="lead">Your trading hub — signals, manual trades, and your account at a glance.</div>
+
+      <div className="statrow">
+        <div className="stat"><div className="v">{balance === null ? "—" : `$${balance.toFixed(2)}`}</div><div className="k">Balance</div></div>
+        <div className="stat"><div className="v">{me.autoTrade ? "AUTO" : "MANUAL"}</div><div className="k">Signal mode</div></div>
+      </div>
+
+      <div className="card" onClick={onGoSignals} style={{ cursor: "pointer" }}>
+        <div className="h2" style={{ fontSize: 17 }}>📡 Live signals</div>
+        <div className="note" style={{ padding: "4px 0 0" }}>See active signals and take them with one tap — or switch on auto mode.</div>
+      </div>
+
+      <div className="card" onClick={onGoTrade} style={{ cursor: "pointer" }}>
+        <div className="h2" style={{ fontSize: 17 }}>📈 Manual trade</div>
+        <div className="note" style={{ padding: "4px 0 0" }}>Pick an asset, set your stake and expiry, and place CALL or PUT yourself.</div>
+      </div>
+
+      <div className="note">Signals are ideas, not guarantees — any trade can lose. Trade amounts you can afford.</div>
+    </div>
+  );
+}
+
+/* ============ SIGNALS ============ */
+type Sig = { id: string; asset: string; direction: string; duration: number; executeAt: string | null; createdAt: string };
+
+function Signals({ me, toast, onTraded, onSettingsChange }: {
+  me: Me;
+  toast: (t: "ok" | "err", m: string) => void;
+  onTraded: () => void;
+  onSettingsChange: (s: { autoTrade: boolean; autoAmount: number }) => void;
+}) {
+  const [signals, setSignals] = useState<Sig[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [taking, setTaking] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    api.activeSignals().then(setSignals).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 15_000); // refresh every 15s
+    return () => clearInterval(t);
+  }, [load]);
+
+  const take = async (s: Sig) => {
+    setTaking(s.id);
+    try {
+      const r = await api.takeSignal(s.id, me.autoAmount);
+      haptic.ok(); toast("ok", `Trade placed · #${r.order_id}`); onTraded();
+    } catch (e: any) { haptic.err(); toast("err", e.message); }
+    finally { setTaking(null); }
+  };
+
+  const setMode = async (autoTrade: boolean) => {
+    haptic.tap();
+    const r = await api.updateSettings({ autoTrade });
+    onSettingsChange(r);
+    toast("ok", autoTrade ? "Auto-trading ON — signals execute automatically" : "Manual mode — you approve each signal");
+  };
+
+  const setStake = async (autoAmount: number) => {
+    haptic.tap();
+    const r = await api.updateSettings({ autoAmount });
+    onSettingsChange(r);
+  };
+
+  return (
+    <div className="screen">
+      <div className="eyebrow">Signals</div>
+      <div className="h2">Live signals</div>
+      <div className="lead">New signals appear here and in your Telegram chat.</div>
+
+      {me.autoTrade && (
+        <div className="auto-banner">
+          <div style={{ fontSize: 22 }}>⚡</div>
+          <div><b>AUTO MODE ON</b><span>Signals execute automatically with ${me.autoAmount} stake</span></div>
+        </div>
+      )}
+
+      <div className="card">
+        <div className="field" style={{ marginBottom: 10 }}>
+          <label className="field-label">Signal mode</label>
+          <div className="segmented">
+            <button className={clsx("seg", !me.autoTrade && "active")} onClick={() => setMode(false)}>Manual</button>
+            <button className={clsx("seg", me.autoTrade && "active")} onClick={() => setMode(true)}>Auto</button>
+          </div>
+        </div>
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label className="field-label">Stake per signal — ${me.autoAmount}</label>
+          <div className="chips">
+            {[1, 5, 10, 25, 50].map((v) => (
+              <button key={v} className={clsx("chip", me.autoAmount === v && "active")} onClick={() => setStake(v)}>${v}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {loading && <div className="note">Loading signals…</div>}
+      {!loading && signals.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 28 }}>
+          <div style={{ fontSize: 34, marginBottom: 8 }}>📡</div>
+          <b>No active signals right now</b>
+          <div className="note">You'll get a Telegram message the moment one drops.</div>
+        </div>
+      )}
+
+      {signals.map((s) => (
+        <div key={s.id} className={clsx("sig-card", s.direction)}>
+          <div className="sig-head">
+            <div className="sig-asset">{s.asset}</div>
+            <div className={clsx("sig-dir", s.direction)}>{s.direction === "call" ? "▲ CALL" : "▼ PUT"}</div>
+          </div>
+          <div className="sig-meta">
+            {s.duration}m expiry · {s.executeAt ? `⏰ ${new Date(s.executeAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "⚡ live now"}
+          </div>
+          {!me.autoTrade && (
+            <button className={clsx("btn", s.direction === "call" ? "up" : "down")}
+              onClick={() => take(s)} disabled={taking === s.id}>
+              {taking === s.id ? "Placing…" : `Take · $${me.autoAmount}`}
+            </button>
+          )}
+          {me.autoTrade && <div className="note" style={{ padding: 0 }}>Will auto-execute for you ⚡</div>}
+        </div>
+      ))}
+
+      <div className="note"><b>Note:</b> signals are ideas, not guarantees — any trade can lose. You control your stake.</div>
+    </div>
+  );
+}
+
+/* ============ MANUAL TRADE ============ */
+function Trade({ toast, onTraded }: { toast: (t: "ok" | "err", m: string) => void; onTraded: () => void }) {
+  const [assets, setAssets] = useState<string[]>([]);
+  const [asset, setAsset] = useState("");
   const [amount, setAmount] = useState(1);
   const [duration, setDuration] = useState(1);
   const [placing, setPlacing] = useState<"call" | "put" | null>(null);
 
-  const loadBalance = async () => {
-    setRefreshing(true);
-    try { const { balance } = await api.iqBalance(); setBalance(balance); }
-    catch (e: any) {
-      if (e.message.includes("401") || e.message.includes("not connected")) {
-        onSessionLost();
-      } else onToast("err", e.message);
-    }
-    finally { setRefreshing(false); }
-  };
-
-  useEffect(() => { loadBalance(); }, []);
+  useEffect(() => {
+    api.iqAssets().then((d) => {
+      const uniq = [...new Set(d.assets.map((a) => a.asset))];
+      setAssets(uniq);
+      if (uniq.length) setAsset(uniq[0]);
+    }).catch(() => {});
+  }, []);
 
   const trade = async (direction: "call" | "put") => {
     setPlacing(direction);
     try {
-      const { order_id } = await api.iqOrder(asset, amount, direction, duration);
-      haptic.success();
-      onToast("ok", `${direction.toUpperCase()} placed · #${order_id}`);
-      loadBalance();
-    } catch (e: any) {
-      haptic.error();
-      onToast("err", e.message);
-    } finally { setPlacing(null); }
+      const r = await api.iqOrder(asset, amount, direction, duration);
+      haptic.ok(); toast("ok", `${direction.toUpperCase()} placed · #${r.order_id}`); onTraded();
+    } catch (e: any) { haptic.err(); toast("err", e.message); }
+    finally { setPlacing(null); }
   };
 
   return (
-    <>
-      <div className="card">
-        <div className="card-label">Balance</div>
-        <div className="balance">
-          <div className="balance-value">
-            <span className="currency">$</span>
-            {balance === null ? "—" : balance.toFixed(2)}
-          </div>
-          <button className={clsx("icon-btn", refreshing && "spin")}
-            onClick={() => { haptic.tap(); loadBalance(); }} aria-label="Refresh">
-            <RefreshIcon />
-          </button>
-        </div>
-      </div>
+    <div className="screen">
+      <div className="eyebrow">Manual</div>
+      <div className="h2">Place a trade</div>
+      <div className="lead">Only assets open for trading right now are shown.</div>
 
       <div className="card">
-        <div className="card-label">New Trade</div>
-
         <div className="field">
           <label className="field-label">Asset</label>
           <select className="input" value={asset} onChange={(e) => setAsset(e.target.value)}>
-            {ASSETS.map((a) => <option key={a} value={a}>{a}</option>)}
+            {assets.length === 0 && <option>Loading…</option>}
+            {assets.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
 
         <div className="field">
-          <label className="field-label">Amount (USD)</label>
+          <label className="field-label">Amount — ${amount}</label>
           <div className="amount-row">
             <button className="stepper" onClick={() => { haptic.tap(); setAmount((a) => Math.max(1, a - 1)); }}>−</button>
             <input className="input" type="number" min={1} value={amount}
@@ -227,11 +401,9 @@ function Dashboard({ onToast, onSessionLost }: {
             <button className="stepper" onClick={() => { haptic.tap(); setAmount((a) => a + 1); }}>+</button>
           </div>
           <div className="chips">
-            {QUICK_AMOUNTS.map((v) => (
-              <button key={v} onClick={() => { haptic.tap(); setAmount(v); }}
-                className={clsx("chip", amount === v && "active")}>
-                ${v}
-              </button>
+            {[1, 5, 10, 25, 50].map((v) => (
+              <button key={v} className={clsx("chip", amount === v && "active")}
+                onClick={() => { haptic.tap(); setAmount(v); }}>${v}</button>
             ))}
           </div>
         </div>
@@ -239,105 +411,36 @@ function Dashboard({ onToast, onSessionLost }: {
         <div className="field">
           <label className="field-label">Expiry</label>
           <div className="segmented">
-            {DURATIONS.map((d) => (
-              <button key={d} onClick={() => { haptic.tap(); setDuration(d); }}
-                className={clsx("seg", duration === d && "active")}>
-                {d}m
-              </button>
+            {[1, 5, 15].map((d) => (
+              <button key={d} className={clsx("seg", duration === d && "active")}
+                onClick={() => { haptic.tap(); setDuration(d); }}>{d}m</button>
             ))}
           </div>
         </div>
 
-        <div className="trade-row">
-          <button className="btn btn-call" onClick={() => trade("call")} disabled={placing !== null}>
-            {placing === "call" ? <MiniSpinner /> : <>▲ CALL</>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <button className="btn up" onClick={() => trade("call")} disabled={placing !== null || !asset}>
+            {placing === "call" ? "…" : "▲ CALL"}
           </button>
-          <button className="btn btn-put" onClick={() => trade("put")} disabled={placing !== null}>
-            {placing === "put" ? <MiniSpinner /> : <>▼ PUT</>}
+          <button className="btn down" onClick={() => trade("put")} disabled={placing !== null || !asset}>
+            {placing === "put" ? "…" : "▼ PUT"}
           </button>
         </div>
       </div>
-    </>
-  );
-}
-
-/* ---------- Chrome ---------- */
-function Header({ user, onDisconnect }: { user: TgUser | null; onDisconnect?: () => void }) {
-  const initial = user?.first_name?.[0]?.toUpperCase() ?? "?";
-  return (
-    <div className="header">
-      <div className="header-user">
-        <div className="avatar">{initial}</div>
-        <div>
-          <div className="header-name">{user?.first_name ?? "…"}</div>
-          <div className="header-sub" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span className="status-dot" /> Connected
-          </div>
-        </div>
-      </div>
-      {onDisconnect && (
-        <button className="icon-btn" onClick={() => { haptic.tap(); onDisconnect(); }} aria-label="Disconnect">
-          <LogoutIcon />
-        </button>
-      )}
     </div>
   );
 }
 
-function Splash({ children }: { children: React.ReactNode }) {
-  return <div className="splash"><div className="splash-inner">{children}</div></div>;
-}
-
-function ErrorState({ msg }: { msg: string }) {
-  return (
-    <>
-      <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Something went wrong</div>
-      <div style={{ color: "var(--text-dim)", fontSize: 14 }}>{msg}</div>
-    </>
-  );
-}
-
+/* ============ TOASTS ============ */
 function ToastStack({ toasts }: { toasts: Toast[] }) {
   if (!toasts.length) return null;
   return (
     <div className="toast-wrap">
       {toasts.map((t) => (
         <div key={t.id} className={clsx("toast", t.type)}>
-          <div className="toast-icon">{t.type === "ok" ? "✓" : "!"}</div>
-          <div>{t.text}</div>
+          <span>{t.type === "ok" ? "✅" : "⚠️"}</span>{t.text}
         </div>
       ))}
     </div>
   );
-}
-
-/* ---------- Icons ---------- */
-function RefreshIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M23 4v6h-6" /><path d="M1 20v-6h6" />
-      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-    </svg>
-  );
-}
-
-function LogoutIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-      <polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}
-
-function MiniSpinner() {
-  return <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2, margin: 0, borderTopColor: "white" }} />;
-}
-
-/* ---------- Theme ---------- */
-function applyTelegramTheme(tg: NonNullable<Window["Telegram"]>["WebApp"]) {
-  const root = document.documentElement;
-  const isLight = tg.colorScheme === "light";
-  root.setAttribute("data-theme", isLight ? "light" : "dark");
 }

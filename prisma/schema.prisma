@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  telegramId   BigInt    @unique
+  firstName    String
+  username     String?
+  isAdmin      Boolean   @default(false)
+  hasAccess    Boolean   @default(false)   // unlocked with access code
+  autoTrade    Boolean   @default(false)   // auto-execute signals
+  autoAmount   Float     @default(1)       // stake for auto trades
+  credits      Int       @default(0)       // for later
+  createdAt    DateTime  @default(now())
+
+  trades       Trade[]
+}
+
+model Signal {
+  id          String    @id @default(cuid())
+  asset       String                        // e.g. EURUSD-OTC
+  direction   String                        // "call" | "put"
+  duration    Int                           // minutes
+  executeAt   DateTime?                     // null = execute immediately
+  status      String    @default("active")  // active | executed | expired | cancelled
+  note        String?
+  createdBy   BigInt                        // admin telegramId
+  createdAt   DateTime  @default(now())
+
+  trades      Trade[]
+}
+
+model Trade {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  signalId   String?
+  signal     Signal?   @relation(fields: [signalId], references: [id])
+  orderId    BigInt?
+  asset      String
+  amount     Float
+  direction  String
+  duration   Int
+  mode       String                         // "auto" | "manual" | "signal"
+  status     String    @default("placed")   // placed | won | lost | equal | failed
+  profit     Float?
+  placedAt   DateTime  @default(now())
+
+  @@index([userId, placedAt])
+  @@index([signalId])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
