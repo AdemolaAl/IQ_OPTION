@@ -184,10 +184,21 @@ app.post<{ Body: { autoTrade?: boolean; autoAmount?: number } }>("/api/settings"
 });
 
 app.get("/api/signals/active", async () => {
+  const cutoff = new Date(Date.now() - 30 * 60 * 1000); // last 30 min
   return prisma.signal.findMany({
-    where: { status: "active" },
+    where: {
+      OR: [
+        { status: "active" },
+        { status: "executed", createdAt: { gte: cutoff } },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     take: 10,
+    select: {
+      id: true, asset: true, direction: true,
+      duration: true, executeAt: true, createdAt: true,
+      status: true,
+    },
   });
 });
 

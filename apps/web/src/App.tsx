@@ -244,7 +244,7 @@ function Home({ me, balance, onGoTrade, onGoSignals }: {
 }
 
 /* ============ SIGNALS ============ */
-type Sig = { id: string; asset: string; direction: string; duration: number; executeAt: string | null; createdAt: string };
+type Sig = { id: string; asset: string; direction: string; duration: number; status?: string; executeAt: string | null; createdAt: string };
 
 function Signals({ me, toast, onTraded, onSettingsChange }: {
   me: Me;
@@ -335,8 +335,13 @@ function Signals({ me, toast, onTraded, onSettingsChange }: {
             <div className={clsx("sig-dir", s.direction)}>{s.direction === "call" ? "▲ CALL" : "▼ PUT"}</div>
           </div>
           <div className="sig-meta">
-            {s.duration}m expiry · {s.executeAt ? `⏰ ${new Date(s.executeAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "⚡ live now"}
-          </div>
+  {s.duration}m expiry ·{" "}
+  {s.status === "active"
+    ? s.executeAt
+      ? `⏰ ${new Date(s.executeAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+      : "⚡ live now"
+    : "✅ executed"}
+</div>
           {!me.autoTrade && (
             <button className={clsx("btn", s.direction === "call" ? "up" : "down")}
               onClick={() => take(s)} disabled={taking === s.id}>
