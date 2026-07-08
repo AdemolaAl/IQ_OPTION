@@ -237,8 +237,13 @@ app.post("/api/iq/disconnect", async (req) => {
   return { ok: true };
 });
 
-app.post<{ Body: { code: string } }>("/api/access/verify", async (req, reply) => {
-  const tgId = BigInt(req.telegramId!);
+
+app.post<{ Body: { code: string, initData: string } }>("/api/access/verify", async (req, reply) => {
+  const tgUser = verifyInitData(req.body.initData, BOT_TOKEN);
+  if (!tgUser) return reply.code(401).send({ error: "invalid initData" });
+
+  
+  const tgId = BigInt( tgUser.id );
   const setting = await prisma.appSetting.findUnique({ where: { key: "access_code" } });
   if (!setting || req.body.code.trim() !== setting.value) {
     return reply.code(403).send({ error: "Invalid access code" });
