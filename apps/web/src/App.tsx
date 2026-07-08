@@ -354,19 +354,33 @@ function Signals({ me, toast, onTraded, onSettingsChange }: {
 
 /* ============ MANUAL TRADE ============ */
 function Trade({ toast, onTraded }: { toast: (t: "ok" | "err", m: string) => void; onTraded: () => void }) {
-  const [assets, setAssets] = useState<string[]>([]);
-  const [asset, setAsset] = useState("");
+  const DEFAULT_ASSETS = [
+  "EURUSD",
+  "GBPUSD",
+  "USDJPY",
+  "EURUSD-OTC",
+  "GBPUSD-OTC",
+  "USDJPY-OTC",
+];
+
+const [assets, setAssets] = useState<string[]>(DEFAULT_ASSETS);
+const [asset, setAsset] = useState(DEFAULT_ASSETS[0]);
   const [amount, setAmount] = useState(1);
   const [duration, setDuration] = useState(1);
   const [placing, setPlacing] = useState<"call" | "put" | null>(null);
 
-  useEffect(() => {
-    api.iqAssets().then((d) => {
-      const uniq = [...new Set(d.assets.map((a) => a.asset))];
-      setAssets(uniq);
-      if (uniq.length) setAsset(uniq[0]);
-    }).catch(() => {});
-  }, []);
+useEffect(() => {
+  api.iqAssets()
+    .then((d) => {
+      const open = new Set(d.assets.map((a) => a.asset));
+      const available = DEFAULT_ASSETS.filter((a) => open.has(a));
+      if (available.length) {
+        setAssets(available);
+        if (!available.includes(asset)) setAsset(available[0]);
+      }
+    })
+    .catch(() => {}); // keep defaults if the assets endpoint fails
+}, []);
 
   const trade = async (direction: "call" | "put") => {
     setPlacing(direction);
