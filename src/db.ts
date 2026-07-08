@@ -1,6 +1,2 @@
-import pkg from "@prisma/client";
-
-// Support environments where @prisma/client may not export named bindings
-const { PrismaClient } = (pkg as any);
-
+import { PrismaClient } from "@prisma/client";
 export const prisma = new PrismaClient();
