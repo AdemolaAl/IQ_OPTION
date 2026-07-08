@@ -141,12 +141,31 @@ declare module "fastify" {
 
 // Auth hook for /api/iq/*
 app.addHook("preHandler", async (req, reply) => {
-  if (!req.url.startsWith("/api/iq/")) return;
+  const needsAuth =
+    req.url.startsWith("/api/iq/") ||
+    req.url.startsWith("/api/signals") ||
+    req.url.startsWith("/api/access") ||
+    req.url.startsWith("/api/settings");
+
+  if (!needsAuth) return;
+
   const token = req.headers.authorization?.replace("Bearer ", "");
   if (!token) return reply.code(401).send({ error: "no token" });
+
   const payload = verifyToken(token);
-  if (!payload) return reply.code(401).send({ error: "invalid or expired token" });
+  if (!payload) return reply.code(401).send({ error: "invalid token" });
+
   req.telegramId = payload.telegramId;
+
+  // Access check — but NOT for the verify endpoint itself
+  // (user is trying to GET access, they don't have it yet)
+  if (req.url.startsWith("/api/access")) return;
+
+  const user = await prisma.user.findUnique({
+    where: { telegramId: BigInt(payload.telegramId) },
+  });
+  if (!user?.hasAccess) return reply.code(403).send({ error: "access code required" });
+  (req as any).dbUser = user;
 });
 
 app.get("/health", async () => ({ ok: true }));
@@ -237,17 +256,16 @@ app.post("/api/iq/disconnect", async (req) => {
   return { ok: true };
 });
 
+app.post<{ Body: { code: string } }>("/api/access/verify", async (req, reply) => {
+  if (!req.telegramId) return reply.code(401).send({ error: "unauthorized" });
 
-app.post<{ Body: { code: string, initData: string } }>("/api/access/verify", async (req, reply) => {
-  const tgUser = verifyInitData(req.body.initData, BOT_TOKEN);
-  if (!tgUser) return reply.code(401).send({ error: "invalid initData" });
-
-  
-  const tgId = BigInt( tgUser.id );
+  const tgId = BigInt(req.telegramId);
   const setting = await prisma.appSetting.findUnique({ where: { key: "access_code" } });
+
   if (!setting || req.body.code.trim() !== setting.value) {
     return reply.code(403).send({ error: "Invalid access code" });
   }
+
   await prisma.user.update({ where: { telegramId: tgId }, data: { hasAccess: true } });
   return { ok: true };
 });
