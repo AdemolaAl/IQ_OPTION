@@ -1,6 +1,6 @@
 import { prisma } from "./db.js";
 
-const ADMIN_TELEGRAM_ID = 8804781360n; // ← your Telegram ID (from your screenshot URL)
+const ADMIN_TELEGRAM_ID = 6169235164; // ← your Telegram ID (from your screenshot URL)
 
 export async function seed() {
   await prisma.appSetting.upsert({
